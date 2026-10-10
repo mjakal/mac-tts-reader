@@ -1,0 +1,11 @@
+.DS_Store
+__pycache__/
+*.py[cod]
+*.log
+.venv/
+*.dist/
+*.build/
+*.onefile-build/
+*.onefile-dist/
+AGENTS.md
+tts-server

@@ -1,0 +1,6 @@
+aiohttp
+cleantext
+edge-tts
+miniaudio
+nltk
+setproctitle
