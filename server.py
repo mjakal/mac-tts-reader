@@ -17,12 +17,12 @@ import cleantext
 from playback import WaveObject
 
 # --- Config ---
-SOCKET_PATH = "/tmp/mac_tts_reader.sock"
-PROCESS_NAME = "mac-tts-reader-server"
+SOCKET_PATH = "/tmp/enge_tts.sock"
+PROCESS_NAME = "enge-tts-server"
 DEFAULT_VOICE = "en-US-EmmaNeural"
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.ERROR,
     format="%(asctime)s - SERVER - %(message)s",
     datefmt="%H:%M:%S",
 )
@@ -67,10 +67,6 @@ class TTSPlayer:
                     raise RuntimeError(
                         f"Speech service returned HTTP {error.status} after {attempt + 1} attempt(s)."
                     ) from error
-                logging.warning(
-                    "Speech service returned HTTP %s; retrying synthesis (%s/%s).",
-                    error.status, attempt + 1, attempts,
-                )
                 await asyncio.sleep(0.5 * (2 ** attempt))
         
         audio_data = miniaudio.decode(audio_bytes, output_format=SampleFormat.SIGNED16)
@@ -129,9 +125,6 @@ class TTSPlayer:
             if ready is not None and not ready.done():
                 ready.set_exception(e)
             logging.error(f"Playback error: {e}")
-        finally:
-            logging.info("Playback finished or stopped.")
-
 class TTSServer:
     def __init__(self):
         self.current_player_task = None
@@ -145,9 +138,6 @@ class TTSServer:
     async def handle_client(self, reader, writer):
         data = await reader.read(100000) # Read up to 100KB
         message = data.decode()
-        addr = writer.get_extra_info('peername')
-        logging.info(f"Received request from {addr}")
-
         try:
             request = json.loads(message)
             command = request.get('command')
@@ -200,12 +190,11 @@ class TTSServer:
             logging.error(f"Error handling request: {e}")
             response = f"Server Error: {str(e)}"
 
-        logging.info(f"Response: {response}")
         try:
             writer.write(response.encode())
             await writer.drain()
         except (ConnectionResetError, BrokenPipeError):
-            logging.warning("Client disconnected before response was fully sent (not critical).")
+            pass
         except Exception as e:
             logging.error(f"Network write error: {e}")
         finally:
@@ -233,7 +222,6 @@ class TTSServer:
             fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             os.close(lock_fd)
-            logging.info("Server is already running.")
             return
 
         try:
@@ -241,8 +229,6 @@ class TTSServer:
                 os.remove(SOCKET_PATH)
 
             server = await asyncio.start_unix_server(self.handle_client, path=SOCKET_PATH)
-            logging.info(f"Serving on {SOCKET_PATH}")
-
             async with server:
                 await server.serve_forever()
         finally:

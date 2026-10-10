@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Install this macOS client as ~/mac-tts-reader/tts-client beside a built tts-server.
+# Install this macOS client as ~/tts/tts-client beside a built tts-server.
 
 PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/usr/bin:/bin:/usr/sbin:/sbin"
 export PATH
 
-SOCKET_PATH="/tmp/mac_tts_reader.sock"
+SOCKET_PATH="/tmp/enge_tts.sock"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVER_BIN="$SCRIPT_DIR/tts-server.dist/tts-server"
 LEGACY_SERVER_BIN="$SCRIPT_DIR/tts-server"
@@ -147,13 +147,15 @@ send_request() {
     fi
 
     case "$RESPONSE" in
-        "Error: "*)
+        Error*|"Server Error"*|"Invalid JSON"|"Unknown command")
             printf '%s\n' "$RESPONSE" >&2
             exit 1
             ;;
     esac
 
-    printf '%s\n' "$RESPONSE"
+    if [ "$LIST" = true ]; then
+        printf '%s\n' "$RESPONSE"
+    fi
 }
 
 TEXT=""

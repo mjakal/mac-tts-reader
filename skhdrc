@@ -1,4 +1,4 @@
 # skhd global hotkeys. The macOS client copies the selected text.
-ctrl + alt - q : "$HOME/mac-tts-reader/tts-client" -v en-US-EmmaNeural >> "$HOME/mac-tts-reader/tts-hotkeys.log" 2>&1
-ctrl + alt - w : "$HOME/mac-tts-reader/tts-client" -v hr-HR-GabrijelaNeural >> "$HOME/mac-tts-reader/tts-hotkeys.log" 2>&1
-ctrl + alt - e : "$HOME/mac-tts-reader/tts-client" -s >> "$HOME/mac-tts-reader/tts-hotkeys.log" 2>&1
+ctrl + alt - q : "$HOME/tts/tts-client" -v en-US-EmmaNeural >> "$HOME/tts/tts-hotkeys.log" 2>&1
+ctrl + alt - w : "$HOME/tts/tts-client" -v hr-HR-GabrijelaNeural >> "$HOME/tts/tts-hotkeys.log" 2>&1
+ctrl + alt - e : "$HOME/tts/tts-client" -s >> "$HOME/tts/tts-hotkeys.log" 2>&1
