@@ -20,11 +20,13 @@ notify_error() {
 }
 
 copy_selected_text() {
-    /usr/bin/osascript -l JavaScript 2>>"$CLIENT_LOG" <<'JXA'
+    local skhd_bin
+    skhd_bin=$(command -v skhd || true)
+    /usr/bin/osascript -l JavaScript - "$skhd_bin" 2>>"$CLIENT_LOG" <<'JXA'
 ObjC.import('AppKit');
 ObjC.import('CoreGraphics');
 
-function run() {
+function run(argv) {
     var pasteboard = $.NSPasteboard.generalPasteboard;
     if (pasteboard.isNil()) {
         throw new Error('The macOS clipboard is unavailable in this session.');
@@ -44,9 +46,19 @@ function run() {
         }
         delay(0.02);
     }
-    delay(0.1);
-    Application('System Events').keystroke('c', { using: 'command down' });
-
+    if (argv[0]) {
+        // skhd already has Accessibility permission for global key events.
+        var copyTask = $.NSTask.alloc.init;
+        copyTask.launchPath = argv[0];
+        copyTask.arguments = ['-k', 'cmd - c'];
+        copyTask.launch;
+        copyTask.waitUntilExit;
+        if (Number(copyTask.terminationStatus) !== 0) {
+            throw new Error('skhd could not send Command-C.');
+        }
+    } else {
+        Application('System Events').keystroke('c', { using: 'command down' });
+    }
     var deadline = Date.now() + 3000;
     while (Date.now() < deadline) {
         if (Number(pasteboard.changeCount) !== previousCount) {
@@ -161,6 +173,7 @@ send_request() {
 TEXT=""
 STOP=false
 LIST=false
+TOGGLE=false
 VOICE="$DEFAULT_VOICE"
 CLEAN=true
 USE_CLIPBOARD=false
@@ -178,6 +191,9 @@ while [ "$#" -gt 0 ]; do
         -s|--stop)
             STOP=true
             ;;
+        -g|--toggle)
+            TOGGLE=true
+            ;;
         -l|--list-voices)
             LIST=true
             ;;
@@ -192,7 +208,7 @@ while [ "$#" -gt 0 ]; do
         --no-clean)
             CLEAN=false
             ;;
-        --clipboard)
+        -c|--clipboard)
             USE_CLIPBOARD=true
             ;;
         *)
@@ -206,6 +222,25 @@ done
 require_command jq
 require_command "$PYTHON_BIN"
 
+if [ "$TOGGLE" = true ]; then
+    if [ "$STOP" = true ] || [ "$LIST" = true ]; then
+        notify_error "--toggle cannot be combined with --stop or --list-voices."
+        exit 1
+    fi
+    JSON_PAYLOAD=$(jq -n '{command: "status"}')
+    TIMEOUT=2
+    ensure_server_running
+    send_request
+    case "$RESPONSE" in
+        Reading) STOP=true ;;
+        Idle) ;;
+        *)
+            notify_error "Unexpected server status: $RESPONSE"
+            exit 1
+            ;;
+    esac
+fi
+
 if [ "$STOP" = true ]; then
     JSON_PAYLOAD=$(jq -n --arg cmd "stop" '{command: $cmd}')
     TIMEOUT=2
@@ -215,7 +250,10 @@ elif [ "$LIST" = true ]; then
 else
     if [ -z "$TEXT" ]; then
         if [ "$USE_CLIPBOARD" = true ]; then
-            TEXT=$(pbpaste 2>/dev/null)
+            if ! TEXT=$(pbpaste 2>/dev/null); then
+                notify_error "Could not read text from the clipboard."
+                exit 1
+            fi
         elif ! TEXT=$(copy_selected_text); then
             notify_error "Could not copy the selected text."
             exit 1

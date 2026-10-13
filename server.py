@@ -145,6 +145,13 @@ class TTSServer:
             if command == 'stop':
                 await self.stop_playback()
                 response = "Stopped"
+
+            elif command == 'status':
+                response = (
+                    "Reading"
+                    if self.current_player_task is not None and not self.current_player_task.done()
+                    else "Idle"
+                )
             
             elif command == 'read':
                 # 1. Stop existing

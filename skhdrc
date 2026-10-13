@@ -1,4 +1,8 @@
-# skhd global hotkeys. The macOS client copies the selected text.
-ctrl + alt - q : "$HOME/tts/tts-client" -v en-US-EmmaNeural >> "$HOME/tts/tts-hotkeys.log" 2>&1
-ctrl + alt - w : "$HOME/tts/tts-client" -v hr-HR-GabrijelaNeural >> "$HOME/tts/tts-hotkeys.log" 2>&1
-ctrl + alt - e : "$HOME/tts/tts-client" -s >> "$HOME/tts/tts-hotkeys.log" 2>&1
+# Previous Edge TTS shortcuts (disabled for the Croatian voice test).
+# ctrl + alt - q : "$HOME/tts/tts-client" -g -v en-US-EmmaNeural >> "$HOME/tts/tts-hotkeys.log" 2>&1
+# ctrl + alt - w : "$HOME/tts/tts-client" -g -v hr-HR-GabrijelaNeural >> "$HOME/tts/tts-hotkeys.log" 2>&1
+# ctrl + alt - e : "$HOME/tts/tts-client" -s >> "$HOME/tts/tts-hotkeys.log" 2>&1
+
+# Copy selected text, then speak it with the local Supertonic Croatian voice.
+ctrl + alt - w : /bin/sh -c 'sleep 0.3; /opt/homebrew/bin/skhd -k "cmd - c"; sleep 0.2; LC_ALL=hr_HR.UTF-8 /usr/bin/pbpaste | "$HOME/.nvm/versions/node/v24.21.0/bin/node" /Users/dev/code/croatian-voice/speak.js --voice 3' >> "$HOME/tts/tts-hotkeys.log" 2>&1
+ctrl + alt - e : "$HOME/.nvm/versions/node/v24.21.0/bin/node" /Users/dev/code/croatian-voice/speak.js --stop >> "$HOME/tts/tts-hotkeys.log" 2>&1

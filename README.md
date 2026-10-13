@@ -45,28 +45,41 @@ After rebuilding, replace the installed `~/tts/tts-server.dist` and restart the 
 ```bash
 ~/tts/tts-client                          # Copy and read selected text
 ~/tts/tts-client -t "Hello"               # Read supplied text
-~/tts/tts-client --clipboard              # Read existing clipboard text
+~/tts/tts-client -c                       # Read existing clipboard text (--clipboard also works)
 ~/tts/tts-client -v hr-HR-GabrijelaNeural # Change voice
 ~/tts/tts-client --no-clean               # Skip text cleaning
+~/tts/tts-client -g                       # Toggle: stop, or copy and read selection
+~/tts/tts-client -g -v hr-HR-GabrijelaNeural # Toggle with a Croatian voice
 ~/tts/tts-client -s                       # Stop playback
 ~/tts/tts-client -l                       # List available voices
 ```
 
-The default action sends Command-C to the active app and requires Accessibility permission for the terminal or shortcut service. `-t`, `--clipboard`, `-s`, and `-l` do not copy a selection.
+With no text argument, the client waits for the shortcut keys to be released, sends Command-C to the active app, then waits for the clipboard to update. When `skhd` is on `PATH`, it sends Command-C with `skhd -k`; otherwise it uses System Events, which may require Accessibility and Automation permission. `-t`, `-c`/`--clipboard`, `-s`, and `-l` do not copy a selection.
+
+Use `-g`/`--toggle` on a hotkey. If speech is playing or still being prepared, it stops without copying text. Otherwise it starts reading, copying the current selection unless `-t` or `-c` supplies text. You can combine it with `-v` to choose a voice. Do not combine it with `-s` or `-l`. Toggle requires the server version with the `status` command; rebuild and restart the server when upgrading from an older version.
 
 ## Global shortcuts
 
-The sample [`skhdrc`](skhdrc) binds Control-Option-Q to English, Control-Option-W to Croatian, and Control-Option-E to stop. Install `skhd`, then copy or merge the sample bindings:
+For Edge TTS, add these bindings to `~/.config/skhd/skhdrc`:
+
+```text
+ctrl + alt - q : "$HOME/tts/tts-client" -g -v en-US-AndrewNeural >> "$HOME/tts/tts-hotkeys.log" 2>&1
+ctrl + alt - w : "$HOME/tts/tts-client" -g -v hr-HR-GabrijelaNeural >> "$HOME/tts/tts-hotkeys.log" 2>&1
+ctrl + alt - e : "$HOME/tts/tts-client" -s >> "$HOME/tts/tts-hotkeys.log" 2>&1
+```
+
+Control-Option-Q and Control-Option-W each start reading with their chosen voice when idle and stop the current reading when pressed again. Either key can stop speech started by the other. Control-Option-E is an optional dedicated stop key.
+
+The repository [`skhdrc`](skhdrc) currently has the Edge TTS lines commented out and uses Control-Option-W/E for a separate Croatian voice experiment. To use the Edge TTS bindings above, remove or comment out the conflicting W/E lines in that sample. Install `skhd` and place your chosen bindings in its config:
 
 ```bash
 brew install jackielii/tap/skhd-zig
 mkdir -p ~/.config/skhd
-cp -n skhdrc ~/.config/skhd/skhdrc
 skhd --start-service
 ```
 
-Grant `skhd` Accessibility permission in System Settings → Privacy & Security. macOS may also request Input Monitoring. After changing permissions or bindings, run `skhd --restart-service`. Change a voice by editing its `-v` value in `~/.config/skhd/skhdrc`; use `~/tts/tts-client -l` to find voice IDs.
+Grant `skhd` Accessibility permission in System Settings → Privacy & Security. macOS may also request Input Monitoring. After changing bindings, run `skhd -r`; after changing `client.sh`, reinstall it with `install -m 755 client.sh ~/tts/tts-client`. If `skhd --start-service` reports that it cannot find its bundled plist, run the command from the installed `skhd.app/Contents/MacOS/skhd` executable instead.
 
 ## Troubleshooting
 
-Client errors go to `~/tts/tts-client.log`; server errors go to `~/tts/tts-server.log`. Successful read and stop requests are silent; `-l` prints the voice list. Run `~/tts/tts-server.dist/tts-server` in a terminal to see startup errors directly. If a shortcut does nothing, check `~/Library/Logs/skhd.log` and the app permissions above.
+Client errors go to `~/tts/tts-client.log`; skhd command output goes to `~/tts/tts-hotkeys.log`; server errors go to `~/tts/tts-server.log`. Successful read and stop requests are silent; `-l` prints the voice list. Run `~/tts/tts-server.dist/tts-server` in a terminal to see startup errors directly. If a hotkey does nothing, check the logs and skhd's Accessibility permission. An `osascript is not allowed to send keystrokes` error means the client used the System Events fallback; check that `skhd` is installed and on `PATH`.
