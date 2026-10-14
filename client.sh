@@ -19,64 +19,6 @@ notify_error() {
     printf '%s - Error: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >>"$CLIENT_LOG" 2>/dev/null || true
 }
 
-copy_selected_text() {
-    local skhd_bin
-    skhd_bin=$(command -v skhd || true)
-    /usr/bin/osascript -l JavaScript - "$skhd_bin" 2>>"$CLIENT_LOG" <<'JXA'
-ObjC.import('AppKit');
-ObjC.import('CoreGraphics');
-
-function run(argv) {
-    var pasteboard = $.NSPasteboard.generalPasteboard;
-    if (pasteboard.isNil()) {
-        throw new Error('The macOS clipboard is unavailable in this session.');
-    }
-    var previousCount = Number(pasteboard.changeCount);
-
-    // A global shortcut can launch us while its modifier keys are still held.
-    // Sending Command-C then would also include Control/Option and miss Copy.
-    var shortcutModifiers = Number($.kCGEventFlagMaskControl) |
-                            Number($.kCGEventFlagMaskAlternate) |
-                            Number($.kCGEventFlagMaskCommand) |
-                            Number($.kCGEventFlagMaskShift);
-    var releaseDeadline = Date.now() + 3000;
-    while (Number($.CGEventSourceFlagsState($.kCGEventSourceStateCombinedSessionState)) & shortcutModifiers) {
-        if (Date.now() >= releaseDeadline) {
-            throw new Error('Release the shortcut keys before copying selected text.');
-        }
-        delay(0.02);
-    }
-    if (argv[0]) {
-        // skhd already has Accessibility permission for global key events.
-        var copyTask = $.NSTask.alloc.init;
-        copyTask.launchPath = argv[0];
-        copyTask.arguments = ['-k', 'cmd - c'];
-        copyTask.launch;
-        copyTask.waitUntilExit;
-        if (Number(copyTask.terminationStatus) !== 0) {
-            throw new Error('skhd could not send Command-C.');
-        }
-    } else {
-        Application('System Events').keystroke('c', { using: 'command down' });
-    }
-    var deadline = Date.now() + 3000;
-    while (Date.now() < deadline) {
-        if (Number(pasteboard.changeCount) !== previousCount) {
-            var selected = ObjC.unwrap(pasteboard.stringForType($.NSPasteboardTypeString));
-            if (typeof selected !== 'string' || selected.trim().length === 0) {
-                throw new Error('The copied selection contains no text.');
-            }
-            return selected;
-        }
-        delay(0.05);
-    }
-    var frontmost = $.NSWorkspace.sharedWorkspace.frontmostApplication;
-    var frontmostName = frontmost.isNil() ? 'unknown' : ObjC.unwrap(frontmost.localizedName);
-    throw new Error('Command-C did not update the clipboard (frontmost app: ' + frontmostName + ').');
-}
-JXA
-}
-
 require_command() {
     if ! command -v "$1" >/dev/null 2>&1; then
         notify_error "Required command '$1' was not found."
@@ -176,7 +118,6 @@ LIST=false
 TOGGLE=false
 VOICE="$DEFAULT_VOICE"
 CLEAN=true
-USE_CLIPBOARD=false
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -209,7 +150,6 @@ while [ "$#" -gt 0 ]; do
             CLEAN=false
             ;;
         -c|--clipboard)
-            USE_CLIPBOARD=true
             ;;
         *)
             notify_error "Unknown parameter: $1"
@@ -249,13 +189,8 @@ elif [ "$LIST" = true ]; then
     TIMEOUT=10
 else
     if [ -z "$TEXT" ]; then
-        if [ "$USE_CLIPBOARD" = true ]; then
-            if ! TEXT=$(pbpaste 2>/dev/null); then
-                notify_error "Could not read text from the clipboard."
-                exit 1
-            fi
-        elif ! TEXT=$(copy_selected_text); then
-            notify_error "Could not copy the selected text."
+        if ! TEXT=$(LC_ALL=en_US.UTF-8 pbpaste 2>/dev/null); then
+            notify_error "Could not read text from the clipboard."
             exit 1
         fi
     fi

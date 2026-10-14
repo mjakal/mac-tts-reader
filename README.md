@@ -40,37 +40,39 @@ install -m 755 client.sh ~/tts/tts-client
 
 After rebuilding, replace the installed `~/tts/tts-server.dist` and restart the running server. The client starts `~/tts/tts-server.dist/tts-server` automatically when no server is available. Nuitka's `--onefile` mode can fail macOS code-signature checks, so use the standalone build shown here.
 
+If speech fails with `Speech service returned HTTP 403`, upgrade the Python dependencies from `requirements.txt`, rebuild the standalone server, install the new distribution, and restart the running server. The bundled server keeps the `edge-tts` version present at build time; updating Python packages alone does not change an existing bundle.
+
 ## Use the client
 
 ```bash
-~/tts/tts-client                          # Copy and read selected text
+~/tts/tts-client                          # Read clipboard text
 ~/tts/tts-client -t "Hello"               # Read supplied text
-~/tts/tts-client -c                       # Read existing clipboard text (--clipboard also works)
+~/tts/tts-client -c                       # Same as no argument (--clipboard also works)
 ~/tts/tts-client -v hr-HR-GabrijelaNeural # Change voice
 ~/tts/tts-client --no-clean               # Skip text cleaning
-~/tts/tts-client -g                       # Toggle: stop, or copy and read selection
+~/tts/tts-client -g                       # Toggle: stop, or read clipboard text
 ~/tts/tts-client -g -v hr-HR-GabrijelaNeural # Toggle with a Croatian voice
 ~/tts/tts-client -s                       # Stop playback
 ~/tts/tts-client -l                       # List available voices
 ```
 
-With no text argument, the client waits for the shortcut keys to be released, sends Command-C to the active app, then waits for the clipboard to update. When `skhd` is on `PATH`, it sends Command-C with `skhd -k`; otherwise it uses System Events, which may require Accessibility and Automation permission. `-t`, `-c`/`--clipboard`, `-s`, and `-l` do not copy a selection.
+With no text argument, the client reads the current clipboard with `pbpaste` in a UTF-8 locale, preserving characters such as `žćđš`. `-c`/`--clipboard` remains an alias for this behavior. The client never copies a selection; the hotkey handles that before starting it.
 
-Use `-g`/`--toggle` on a hotkey. If speech is playing or still being prepared, it stops without copying text. Otherwise it starts reading, copying the current selection unless `-t` or `-c` supplies text. You can combine it with `-v` to choose a voice. Do not combine it with `-s` or `-l`. Toggle requires the server version with the `status` command; rebuild and restart the server when upgrading from an older version.
+Use `-g`/`--toggle` on a hotkey. If speech is playing or still being prepared, it stops. Otherwise it reads the clipboard, or the text supplied with `-t`. You can combine it with `-v` to choose a voice. Do not combine it with `-s` or `-l`. Toggle requires the server version with the `status` command; rebuild and restart the server when upgrading from an older version.
 
 ## Global shortcuts
 
 For Edge TTS, add these bindings to `~/.config/skhd/skhdrc`:
 
 ```text
-ctrl + alt - q : "$HOME/tts/tts-client" -g -v en-US-AndrewNeural >> "$HOME/tts/tts-hotkeys.log" 2>&1
-ctrl + alt - w : "$HOME/tts/tts-client" -g -v hr-HR-GabrijelaNeural >> "$HOME/tts/tts-hotkeys.log" 2>&1
+ctrl + alt - q : /bin/sh -c 'sleep 0.3; /opt/homebrew/bin/skhd -k "cmd - c" && sleep 0.2 && "$HOME/tts/tts-client" -g -v en-US-AndrewNeural' >> "$HOME/tts/tts-hotkeys.log" 2>&1
+ctrl + alt - w : /bin/sh -c 'sleep 0.3; /opt/homebrew/bin/skhd -k "cmd - c" && sleep 0.2 && "$HOME/tts/tts-client" -g -v hr-HR-GabrijelaNeural' >> "$HOME/tts/tts-hotkeys.log" 2>&1
 ctrl + alt - e : "$HOME/tts/tts-client" -s >> "$HOME/tts/tts-hotkeys.log" 2>&1
 ```
 
-Control-Option-Q and Control-Option-W each start reading with their chosen voice when idle and stop the current reading when pressed again. Either key can stop speech started by the other. Control-Option-E is an optional dedicated stop key.
+Control-Option-Q and Control-Option-W pause briefly to allow the shortcut keys to be released, copy the selection with `skhd`, then start reading with their chosen voice when idle or stop the current reading. Either key can stop speech started by the other. Control-Option-E is an optional dedicated stop key. The copy step also runs when a toggle key stops speech.
 
-The repository [`skhdrc`](skhdrc) currently has the Edge TTS lines commented out and uses Control-Option-W/E for a separate Croatian voice experiment. To use the Edge TTS bindings above, remove or comment out the conflicting W/E lines in that sample. Install `skhd` and place your chosen bindings in its config:
+The repository [`skhdrc`](skhdrc) has these Edge TTS bindings enabled. It also keeps the separate Croatian voice experiment commented out. Install `skhd` and place your chosen bindings in its config:
 
 ```bash
 brew install jackielii/tap/skhd-zig
@@ -82,4 +84,4 @@ Grant `skhd` Accessibility permission in System Settings → Privacy & Security.
 
 ## Troubleshooting
 
-Client errors go to `~/tts/tts-client.log`; skhd command output goes to `~/tts/tts-hotkeys.log`; server errors go to `~/tts/tts-server.log`. Successful read and stop requests are silent; `-l` prints the voice list. Run `~/tts/tts-server.dist/tts-server` in a terminal to see startup errors directly. If a hotkey does nothing, check the logs and skhd's Accessibility permission. An `osascript is not allowed to send keystrokes` error means the client used the System Events fallback; check that `skhd` is installed and on `PATH`.
+Client errors go to `~/tts/tts-client.log`; skhd command output goes to `~/tts/tts-hotkeys.log`; server errors go to `~/tts/tts-server.log`. Successful read and stop requests are silent; `-l` prints the voice list. Run `~/tts/tts-server.dist/tts-server` in a terminal to see startup errors directly. If a hotkey does nothing, check the logs and skhd's Accessibility permission.
